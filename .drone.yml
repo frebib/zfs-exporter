@@ -1,0 +1,29 @@
+---
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: docker build
+  pull: always
+  image: spritsail/docker-build
+
+- name: docker publish
+  pull: always
+  image: spritsail/docker-publish
+  settings:
+    repo: frebib/zfs-exporter
+    tags:
+    - latest
+    login: {from_secret: docker_login}
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+---
+kind: signature
+hmac: 762f41c52c231a6f2f49d5b5b4502be641c1d538120032d14f1f4f8ed70c19dd
+
+...
