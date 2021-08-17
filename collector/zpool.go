@@ -24,56 +24,56 @@ var (
 	vdevOpsDesc = prometheus.NewDesc(
 		"zfs_pool_ops_total",
 		"number of operations performed.",
-		[]string{"pool", "type", "parent", "device", "op"},
+		[]string{"pool", "type", "parent", "device", "path", "op"},
 		nil,
 	)
 
 	vdevBytesDesc = prometheus.NewDesc(
 		"zfs_pool_bytes_total",
 		"number of bytes handled",
-		[]string{"pool", "type", "parent", "device", "op"},
+		[]string{"pool", "type", "parent", "device", "path", "op"},
 		nil,
 	)
 
 	vdevErrorsDesc = prometheus.NewDesc(
 		"zfs_pool_errors_total",
 		"number of errors seen",
-		[]string{"pool", "type", "parent", "device", "errortype"},
+		[]string{"pool", "type", "parent", "device", "path", "errortype"},
 		nil,
 	)
 
 	vdevStateDesc = prometheus.NewDesc(
 		"zfs_pool_vdev_state",
 		"vdev state: Unknown, Closed, Offline, Removed, CantOpen, Faulted, Degraded, Healthy.",
-		[]string{"pool", "type", "parent", "device", "state"},
+		[]string{"pool", "type", "parent", "device", "path", "state"},
 		nil,
 	)
 
 	vdevAllocDesc = prometheus.NewDesc(
 		"zfs_pool_allocated_bytes",
 		"number of bytes allocated (usage)",
-		[]string{"pool", "type", "parent", "device"},
+		[]string{"pool", "type", "parent", "device", "path"},
 		nil,
 	)
 
 	vdevSizeDesc = prometheus.NewDesc(
 		"zfs_pool_size_bytes",
 		"size of the vdev in bytes (total capacity).",
-		[]string{"pool", "type", "parent", "device"},
+		[]string{"pool", "type", "parent", "device", "path"},
 		nil,
 	)
 
 	vdevFreeDesc = prometheus.NewDesc(
 		"zfs_pool_free_bytes",
 		"free space on the vdev in bytes.",
-		[]string{"pool", "type", "parent", "device"},
+		[]string{"pool", "type", "parent", "device", "path"},
 		nil,
 	)
 
 	vdevFragDesc = prometheus.NewDesc(
 		"zfs_pool_fragmentation_percent",
 		"device fragmentation percentage",
-		[]string{"pool", "type", "parent", "device"},
+		[]string{"pool", "type", "parent", "device", "path"},
 		nil,
 	)
 
@@ -268,6 +268,17 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 
 	name := vdt.Name()
 	devType := vdt.Type()
+	path := vdt.Path()
+
+	// Try to resolve the root disk in /dev for the vdev disk (partition)
+	if path != "" && devType == zfs.VDevTypeDisk {
+		disk, err := diskFromPartition(path)
+		if err != nil {
+			log.Printf("error resolving disk path '%s': %s", path, err)
+		} else {
+			path = disk
+		}
+	}
 
 	isLog, err := vdt.Config().LookupUint64(zfs.PoolConfigIsLog)
 	if err != nil && !errors.Is(err, zfs.ErrNotFound) {
@@ -283,7 +294,7 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 		vdevStateDesc,
 		prometheus.GaugeValue,
 		float64(stat.State),
-		pool, typ, parent, name,
+		pool, typ, parent, name, path,
 		strings.ToLower(stat.State.String()),
 	)
 
@@ -292,25 +303,25 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 			vdevAllocDesc,
 			prometheus.GaugeValue,
 			float64(stat.Alloc),
-			pool, typ, parent, name,
+			pool, typ, parent, name, path,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			vdevSizeDesc,
 			prometheus.GaugeValue,
 			float64(stat.Space),
-			pool, typ, parent, name,
+			pool, typ, parent, name, path,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			vdevFreeDesc,
 			prometheus.GaugeValue,
 			float64(stat.Space-stat.Alloc),
-			pool, typ, parent, name,
+			pool, typ, parent, name, path,
 		)
 		ch <- prometheus.MustNewConstMetric(
 			vdevFragDesc,
 			prometheus.GaugeValue,
 			float64(stat.Fragmentation),
-			pool, typ, parent, name,
+			pool, typ, parent, name, path,
 		)
 	}
 
@@ -318,32 +329,32 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 		vdevErrorsDesc,
 		prometheus.CounterValue,
 		float64(stat.ReadErrors),
-		pool, typ, parent, name, "read",
+		pool, typ, parent, name, path, "read",
 	)
 	ch <- prometheus.MustNewConstMetric(
 		vdevErrorsDesc,
 		prometheus.CounterValue,
 		float64(stat.WriteErrors),
-		pool, typ, parent, name, "write",
+		pool, typ, parent, name, path, "write",
 	)
 	ch <- prometheus.MustNewConstMetric(
 		vdevErrorsDesc,
 		prometheus.CounterValue,
 		float64(stat.ChecksumErrors),
-		pool, typ, parent, name, "checksum",
+		pool, typ, parent, name, path, "checksum",
 	)
 
 	for op := zfs.ZIOTypeNull + 1; op < zfs.ZIOTypes; op++ {
 		ch <- prometheus.MustNewConstMetric(
 			vdevOpsDesc, prometheus.CounterValue,
 			float64(stat.Ops[op]),
-			pool, typ, parent, name, zioTypeNames[op],
+			pool, typ, parent, name, path, zioTypeNames[op],
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			vdevBytesDesc, prometheus.CounterValue,
 			float64(stat.Bytes[op]),
-			pool, typ, parent, name, zioTypeNames[op],
+			pool, typ, parent, name, path, zioTypeNames[op],
 		)
 	}
 

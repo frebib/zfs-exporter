@@ -154,6 +154,22 @@ func (vdt VDevTree) Name() string {
 	return vdt.name
 }
 
+func (vdt VDevTree) Path() string {
+	switch vdt.Type() {
+	case VDevTypeDisk:
+	case VDevTypeFile:
+		break
+	default:
+		return ""
+	}
+
+	path, err := vdt.nvl.LookupString(PoolConfigPath)
+	if err != nil {
+		panic(err)
+	}
+	return path
+}
+
 func (vdt VDevTree) Type() VDevType {
 	typ, err := vdt.nvl.LookupString(PoolConfigType)
 	if err != nil {
