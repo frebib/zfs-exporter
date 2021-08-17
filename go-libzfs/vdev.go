@@ -107,6 +107,10 @@ type VDevTree struct {
 	name string
 }
 
+func (vdt VDevTree) Config() NVList {
+	return vdt.nvl
+}
+
 func (vdt VDevTree) Name() string {
 	if vdt.name != "" {
 		return vdt.name
@@ -137,10 +141,11 @@ func (vdt VDevTree) Name() string {
 	}
 
 	libzfs := vdt.pool.LibZFS().Handle()
-	ptr := C.zpool_vdev_name(libzfs, vdt.pool.handle, vdt.nvl.handle, 0)
+	// Flag VDEV_NAME_TYPE_ID gives `raidz1-n` where n is the vdev-id. Without
+	// it (flag value of zero), we'd simply get `raidz1` which isn't unique.
+	ptr := C.zpool_vdev_name(libzfs, vdt.pool.handle, vdt.nvl.handle, C.VDEV_NAME_TYPE_ID)
 	if ptr == nil {
-		// shouldn't ever happen
-		return ""
+		panic("zpool_vdev_name() returned nil")
 	}
 	defer C.free(unsafe.Pointer(ptr))
 
