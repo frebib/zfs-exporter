@@ -261,27 +261,26 @@ func (d Dataset) Gets(props ...DatasetProperty) (map[DatasetProperty]*DatasetPro
 
 func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 	var handles []*C.zfs_handle_t
+	handlesPtr := unsafe.Pointer(&handles)
 
 	// cgo has silly type restrictions.
 	// This is the only way I could make it compile
 	callback := (*[0]byte)(C.datasetSlice)
 
 	if types&DatasetTypeFilesystem == DatasetTypeFilesystem {
-		ret := C.zfs_iter_filesystems(d.handle, callback, unsafe.Pointer(&handles))
+		ret := C.zfs_iter_filesystems(d.handle, callback, handlesPtr)
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
-		ret := C.zfs_iter_snapshots(d.handle, C.B_TRUE, callback,
-			unsafe.Pointer(&handles), C.ulong(0), C.ulong(0),
-		)
+		ret := C.zfs_iter_snapshots(d.handle, C.B_TRUE, callback, handlesPtr, 0, 0)
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeBookmark == DatasetTypeBookmark {
-		ret := C.zfs_iter_bookmarks(d.handle, callback, unsafe.Pointer(&handles))
+		ret := C.zfs_iter_bookmarks(d.handle, callback, handlesPtr)
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
