@@ -10,9 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	zfs "github.com/frebib/go-libzfs"
-
 	"github.com/frebib/zfs-exporter/collector"
+	"github.com/frebib/zfs-exporter/zfs"
 )
 
 var (

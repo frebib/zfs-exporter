@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	zfs "github.com/frebib/go-libzfs"
+	"github.com/frebib/zfs-exporter/zfs"
 )
 
 var (
