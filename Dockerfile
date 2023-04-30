@@ -8,7 +8,7 @@ ADD . .
 RUN go build -v
 
 
-FROM alpine:3.14
+FROM alpine:3.17
 
 RUN apk add zfs-libs
 COPY --from=build /build/zfs-exporter /usr/bin/
