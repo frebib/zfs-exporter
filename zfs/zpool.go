@@ -114,7 +114,7 @@ func (ss ScanState) String() string {
 	case DSSFinished:
 		return "finished"
 	case DSSCanceled:
-		return "canceled"
+		return "cancelled"
 	default:
 		return "unknown"
 	}
