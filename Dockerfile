@@ -1,4 +1,4 @@
-FROM golang:alpine AS build
+FROM golang:alpine3.18 AS build
 
 RUN apk add gcc libc-dev zfs-dev
 
@@ -8,7 +8,7 @@ ADD . .
 RUN go build -v
 
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 RUN apk add zfs-libs
 COPY --from=build /build/zfs-exporter /usr/bin/
