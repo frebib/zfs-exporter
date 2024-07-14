@@ -262,7 +262,7 @@ type PoolScanStat struct {
 	EndTime   time.Time // Scan end time
 	ToExamine uint64    // Total bytes to scan
 	Examined  uint64    // Total bytes scanned
-	ToProcess uint64    // Total bytes to process
+	Skipped   uint64    // Total bytes skipped
 	Processed uint64    // Total bytes processed
 	Errors    uint64    // Scan errors
 	// Values not stored on disk

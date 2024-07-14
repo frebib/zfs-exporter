@@ -233,7 +233,7 @@ func (vdt VDevTree) ScanStat() (PoolScanStat, error) {
 		EndTime:        time.Unix(int64(ss.pss_end_time), 0).UTC(),
 		ToExamine:      uint64(ss.pss_to_examine),
 		Examined:       uint64(ss.pss_examined),
-		ToProcess:      uint64(ss.pss_to_process),
+		Skipped:        uint64(ss.pss_skipped),
 		Processed:      uint64(ss.pss_processed),
 		Errors:         uint64(ss.pss_errors),
 		PassExam:       uint64(ss.pss_pass_exam),
