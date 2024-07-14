@@ -1,7 +1,10 @@
 package zfs
 
+// cgo CFLAGS reference
+// https://github.com/johnramsden/zectl/pull/34/commits/f1531921899c8114943cd62b519d977d24f819bb
+
 /*
-#cgo CFLAGS: -D__USE_LARGEFILE64=1
+#cgo CFLAGS: -D__USE_LARGEFILE64=1 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 #include <stdlib.h>
 #include <libzfs.h>
 #include <zfs_prop.h>
@@ -167,6 +170,7 @@ func (s PoolInitializeAction) String() string {
 }
 
 // PoolStatus type representing status of the pool
+//
 //go:generate stringer -type PoolStatus -trimprefix PoolStatus
 type PoolStatus int
 
@@ -398,6 +402,7 @@ func (p *Pool) Get(prop PoolProperty) (*PoolPropertyValue, error) {
 // in via ptr, which is expected to be an unsafe.Pointer(*[]*Pool). This
 // function is intended to be used as a callback to the zfs_iter_* suite of
 // libzfs functions, matching signature: int (*zfs_iter_f)(zfs_handle_t*, void*)
+//
 //export poolSlice
 func poolSlice(handle *C.zpool_handle_t, ptr unsafe.Pointer) C.int {
 	pool := &Pool{handle: handle}
