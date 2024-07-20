@@ -18,8 +18,8 @@ import (
 	"unsafe"
 )
 
-const (
-	msgPoolIsNil = "Pool handle not initialized or its closed"
+var (
+	ErrPoolIsNil = errors.New("pool handle not initialized or its closed")
 )
 
 type PoolProperty int
@@ -321,7 +321,7 @@ func (p Pool) Name() string {
 // Return the state of the pool (ACTIVE or UNAVAILABLE)
 func (p *Pool) State() (PoolState, error) {
 	if p.handle == nil {
-		return 0, errors.New(msgPoolIsNil)
+		return 0, ErrPoolIsNil
 	} else {
 		return PoolState(C.zpool_get_state(p.handle)), nil
 	}
@@ -330,7 +330,7 @@ func (p *Pool) State() (PoolState, error) {
 // Status get pool status. Let you check if pool healthy.
 func (p *Pool) Status() (status PoolStatus, err error) {
 	if p.handle == nil {
-		return 0, errors.New(msgPoolIsNil)
+		return 0, ErrPoolIsNil
 	}
 
 	// TODO: maintain and return zpool errata
