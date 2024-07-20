@@ -11,6 +11,12 @@ import (
 )
 
 var (
+	datasetCreatedAt = prometheus.NewDesc(
+		"zfs_dataset_created_timestamp_seconds",
+		"Unix timestamp representing the created date/time of the dataset",
+		[]string{"name", "pool", "type"},
+		nil,
+	)
 	datasetUsedBytes = prometheus.NewDesc(
 		"zfs_dataset_used_bytes",
 		"space used by dataset and all its descendents in bytes",
@@ -121,6 +127,7 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 	}
 
 	descs := map[zfs.DatasetProperty]*prometheus.Desc{
+		zfs.DatasetPropCreation:      datasetCreatedAt,
 		zfs.DatasetPropUsed:          datasetUsedBytes,
 		zfs.DatasetPropReferenced:    datasetRefBytes,
 		zfs.DatasetPropAvailable:     datasetAvailBytes,
