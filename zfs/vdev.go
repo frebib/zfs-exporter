@@ -70,11 +70,18 @@ func (s VDevState) String() string {
 // VDevAux - vdev aux states
 type VDevAux uint64
 
-func booleanT(b bool) (r C.boolean_t) {
+func boolToC(b bool) C.boolean_t {
 	if b {
 		return 1
 	}
 	return 0
+}
+
+func CToBool(v C.boolean_t) bool {
+	if v == 0 {
+		return false
+	}
+	return true
 }
 
 // vdev aux states.  When a vdev is in the VDevStateCantOpen state, the aux field
