@@ -171,8 +171,6 @@ func (dp DatasetProperty) Type() PropertyType {
 // Dataset - ZFS dataset object
 type Dataset struct {
 	handle *C.zfs_handle_t
-	name   string
-	typ    DatasetType
 }
 
 func (d Dataset) Close() {
@@ -186,20 +184,11 @@ func (d Dataset) LibZFS() *LibZFS {
 }
 
 func (d *Dataset) Name() string {
-	if d.name == "" {
-		d.name = C.GoString(C.zfs_get_name(d.handle))
-	}
-
-	return d.name
+	return C.GoString(C.zfs_get_name(d.handle))
 }
 
 func (d *Dataset) Type() DatasetType {
-	// Cache on first use
-	if d.typ == DatasetTypeUnknown {
-		d.typ = DatasetType(C.zfs_get_type(d.handle))
-	}
-
-	return d.typ
+	return DatasetType(C.zfs_get_type(d.handle))
 }
 
 func (d *Dataset) Pool() *Pool {

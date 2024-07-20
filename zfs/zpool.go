@@ -10,15 +10,10 @@ import "C"
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 	"unsafe"
-)
-
-const (
-	msgPoolIsNil = "Pool handle not initialized or its closed"
 )
 
 type PoolProperty int
@@ -308,33 +303,21 @@ func (p Pool) LibZFS() *LibZFS {
 	}
 }
 
-func (p Pool) Name() string {
-	if p.name == "" {
-		p.name = C.GoString(C.zpool_get_name(p.handle))
-	}
-
-	return p.name
+func (p *Pool) Name() string {
+	return C.GoString(C.zpool_get_name(p.handle))
 }
 
 // State get ZFS pool state
 // Return the state of the pool (ACTIVE or UNAVAILABLE)
-func (p *Pool) State() (PoolState, error) {
-	if p.handle == nil {
-		return 0, errors.New(msgPoolIsNil)
-	} else {
-		return PoolState(C.zpool_get_state(p.handle)), nil
-	}
+func (p *Pool) State() PoolState {
+	return PoolState(C.zpool_get_state(p.handle))
 }
 
 // Status get pool status. Let you check if pool healthy.
-func (p *Pool) Status() (status PoolStatus, err error) {
-	if p.handle == nil {
-		return 0, errors.New(msgPoolIsNil)
-	}
-
+func (p *Pool) Status() PoolStatus {
 	// TODO: maintain and return zpool errata
 	var errata C.zpool_errata_t
-	return PoolStatus(C.zpool_get_status(p.handle, nil, &errata)), nil
+	return PoolStatus(C.zpool_get_status(p.handle, nil, &errata))
 }
 
 func (p *Pool) Config() (NVList, error) {
