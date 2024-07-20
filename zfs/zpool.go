@@ -1,10 +1,6 @@
 package zfs
 
-// cgo CFLAGS reference
-// https://github.com/johnramsden/zectl/pull/34/commits/f1531921899c8114943cd62b519d977d24f819bb
-
 /*
-#cgo CFLAGS: -D__USE_LARGEFILE64=1 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 #include <stdlib.h>
 #include <libzfs.h>
 #include <zfs_prop.h>
