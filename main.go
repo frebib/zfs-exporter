@@ -30,7 +30,6 @@ func main() {
 		panic(err)
 	}
 	defer libzfs.Close()
-	defer libzfs.Close()
 
 	opts := promhttp.HandlerOpts{
 		ErrorLog:          log.Default(),
