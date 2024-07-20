@@ -12,7 +12,6 @@ import "C"
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"unsafe"
 )
@@ -319,14 +318,6 @@ func datasetSlice(handle *C.zfs_handle_t, ptr unsafe.Pointer) C.int {
 	return 0
 }
 
-func datasetInit(hdl *C.zfs_handle_t) (*Dataset, error) {
-	if hdl == nil {
-		return nil, errors.New("zfs handle is nil")
-	}
-
-	return &Dataset{handle: hdl}, nil
-}
-
 func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) ([]*Dataset, error) {
 	var datasets []*Dataset
 
@@ -343,11 +334,7 @@ func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) ([]*Dataset, e
 			continue
 		}
 
-		dataset, err := datasetInit(handle)
-		if err != nil {
-			return nil, err
-		}
-		datasets = append(datasets, dataset)
+		datasets = append(datasets, &Dataset{handle: handle})
 	}
 
 	return datasets, nil
@@ -363,7 +350,7 @@ func (l *LibZFS) DatasetOpen(path string) (*Dataset, error) {
 		return nil, l.Errno()
 	}
 
-	return datasetInit(handle)
+	return &Dataset{handle: handle}, nil
 }
 
 // DatasetOpenAll recursive get handles to all available datasets on system
