@@ -101,7 +101,7 @@ func NewDatasetCollector(libzfs *zfs.LibZFS) *DatasetCollector {
 
 // Collect implements prometheus.Collector.
 func (collector *DatasetCollector) Collect(ch chan<- prometheus.Metric) {
-	datasets, err := collector.libzfs.DatasetOpenAll(zfs.DatasetTypeFilesystem, -1)
+	datasets, err := collector.libzfs.DatasetOpenAll(zfs.DatasetTypeFilesystem|zfs.DatasetTypeSnapshot, -1)
 
 	if err != nil {
 		log.Printf("error opening datasets: %v", err)
@@ -126,22 +126,27 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 		collector.datasetErrors[name] = 0
 	}
 
+	// Common properties for all dataset types (filesystems, volumes, snapshots)
 	descs := map[zfs.DatasetProperty]*prometheus.Desc{
-		zfs.DatasetPropCreation:      datasetCreatedAt,
-		zfs.DatasetPropUsed:          datasetUsedBytes,
-		zfs.DatasetPropReferenced:    datasetRefBytes,
-		zfs.DatasetPropAvailable:     datasetAvailBytes,
-		zfs.DatasetPropWritten:       datasetWrittenBytes,
-		zfs.DatasetPropReadonly:      datasetReadOnly,
-		zfs.DatasetPropCompressratio: datasetCompressRatio,
+		zfs.DatasetPropCreation:   datasetCreatedAt,
+		zfs.DatasetPropUsed:       datasetUsedBytes,
+		zfs.DatasetPropReferenced: datasetRefBytes,
+		zfs.DatasetPropWritten:    datasetWrittenBytes,
 	}
 
+	// Common properties to filesystem & volume datasets
+	if typ == zfs.DatasetTypeFilesystem || typ == zfs.DatasetTypeVolume {
+		descs[zfs.DatasetPropAvailable] = datasetAvailBytes
+		descs[zfs.DatasetPropCompressratio] = datasetCompressRatio
+		descs[zfs.DatasetPropReadonly] = datasetReadOnly
+	}
+
+	// Various random properties specific to each dataset types
 	switch typ {
-	case zfs.DatasetTypeVolume:
-		// Only applicable to volumes
-		descs[zfs.DatasetPropVolsize] = datasetVolsizeBytes
-	default:
+	case zfs.DatasetTypeFilesystem:
 		descs[zfs.DatasetPropQuota] = datasetQuotaBytes
+	case zfs.DatasetTypeVolume:
+		descs[zfs.DatasetPropVolsize] = datasetVolsizeBytes
 	}
 
 	props := make([]zfs.DatasetProperty, 0, len(descs))

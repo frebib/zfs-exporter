@@ -273,7 +273,7 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
-		ret := C.zfs_iter_snapshots(d.handle, C.B_TRUE, callback, handlesPtr, 0, 0)
+		ret := C.zfs_iter_snapshots(d.handle, C.B_FALSE, callback, handlesPtr, 0, 0)
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
