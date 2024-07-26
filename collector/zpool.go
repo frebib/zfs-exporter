@@ -180,31 +180,21 @@ func (collector *ZpoolCollector) collectPool(metrics chan<- prometheus.Metric, p
 		collector.poolErrors[name] = 0
 	}
 
-	state, err := pool.State()
-	if err != nil {
-		log.Printf("error getting state of pool '%s': %v\n", name, err)
-		collector.poolErrors[name]++
-	} else {
-		metrics <- prometheus.MustNewConstMetric(
-			poolStateDesc,
-			prometheus.GaugeValue,
-			float64(state),
-			name, strings.ToLower(state.String()),
-		)
-	}
+	state := pool.State()
+	metrics <- prometheus.MustNewConstMetric(
+		poolStateDesc,
+		prometheus.GaugeValue,
+		float64(state),
+		name, strings.ToLower(state.String()),
+	)
 
-	status, err := pool.Status()
-	if err != nil {
-		log.Printf("error getting status of pool '%s': %v", name, err)
-		collector.poolErrors[name]++
-	} else {
-		metrics <- prometheus.MustNewConstMetric(
-			poolStatusDesc,
-			prometheus.GaugeValue,
-			float64(status),
-			name, strings.ToLower(status.String()),
-		)
-	}
+	status := pool.Status()
+	metrics <- prometheus.MustNewConstMetric(
+		poolStatusDesc,
+		prometheus.GaugeValue,
+		float64(status),
+		name, strings.ToLower(status.String()),
+	)
 
 	roProp, err := pool.Get(zfs.PoolPropReadonly)
 	if err != nil {
