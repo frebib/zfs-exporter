@@ -9,6 +9,7 @@ import (
 
 	kitlog "github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
 
@@ -38,6 +39,7 @@ func main() {
 	}
 
 	registry := prometheus.NewRegistry()
+	registry.MustRegister(collectors.NewGoCollector())
 	registry.MustRegister(collector.NewZpoolCollector(libzfs))
 	registry.MustRegister(collector.NewDatasetCollector(libzfs))
 
