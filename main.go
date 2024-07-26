@@ -55,18 +55,15 @@ func main() {
 			*metricsPath,
 		)
 	})
-	server := &http.Server{
-		Addr:    *listenAddress,
-		Handler: router,
-	}
 
+	server := http.Server{Handler: router}
 	logger := kitlog.NewLogfmtLogger(log.Writer())
 	config := web.FlagConfig{
 		WebListenAddresses: &[]string{*listenAddress},
 		WebConfigFile:      webConfigFile,
 	}
 
-	err = web.ListenAndServe(server, &config, logger)
+	err = web.ListenAndServe(&server, &config, logger)
 	if !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("%s", err)
 	}
