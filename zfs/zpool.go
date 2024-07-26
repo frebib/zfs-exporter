@@ -405,9 +405,9 @@ func (ps Pools) Close() {
 func (l *LibZFS) PoolOpenAll() (Pools, error) {
 	var handles list[*C.zpool_handle_t]
 
-	l.namespaceMtx.Lock()
+	l.lock.Lock()
 	err := C.zpool_iter(l.handle, listAppend, handles.pointer())
-	l.namespaceMtx.Unlock()
+	l.lock.Unlock()
 	if int(err) != 0 {
 		return nil, l.Errno()
 	}

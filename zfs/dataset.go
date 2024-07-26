@@ -253,19 +253,25 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 	defer handles.clear()
 
 	if types&DatasetTypeFilesystem == DatasetTypeFilesystem {
+		d.LibZFS().lock.Lock()
 		ret := C.zfs_iter_filesystems(d.handle, listAppend, handles.pointer())
+		d.LibZFS().lock.Unlock()
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
+		d.LibZFS().lock.Lock()
 		ret := C.zfs_iter_snapshots(d.handle, C.B_FALSE, listAppend, handles.pointer(), 0, 0)
+		d.LibZFS().lock.Unlock()
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeBookmark == DatasetTypeBookmark {
+		d.LibZFS().lock.Lock()
 		ret := C.zfs_iter_bookmarks(d.handle, listAppend, handles.pointer())
+		d.LibZFS().lock.Unlock()
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
@@ -332,9 +338,9 @@ func (l *LibZFS) DatasetOpenAll(types DatasetType, depth int) ([]*Dataset, error
 	var handles list[*C.zfs_handle_t]
 	defer handles.clear()
 
-	l.namespaceMtx.Lock()
+	l.lock.Lock()
 	ret := C.zfs_iter_root(l.handle, listAppend, handles.pointer())
-	l.namespaceMtx.Unlock()
+	l.lock.Unlock()
 	if int(ret) != 0 {
 		return nil, fmt.Errorf("zfs_iter_root returned %d", int(ret))
 	}

@@ -46,8 +46,8 @@ func getDataset(handle *C.zfs_handle_t) *Dataset {
 
 type LibZFS struct {
 	// include/libzfs_impl.h
-	handle       *C.libzfs_handle_t
-	namespaceMtx sync.Mutex
+	handle *C.libzfs_handle_t
+	lock   sync.Mutex
 }
 
 func (l *LibZFS) Close() {
