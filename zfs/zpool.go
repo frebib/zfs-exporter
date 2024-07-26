@@ -421,20 +421,17 @@ func (ps Pools) Close() {
 // Returns array of Pool handlers, each have to be closed after not needed
 // anymore. Call Pool.Close() method.
 func (l *LibZFS) PoolOpenAll() (Pools, error) {
-	var handleList C.struct_list
+	var handles list[*C.zpool_handle_t]
 
 	l.namespaceMtx.Lock()
-	err := C.zpool_iter(l.Handle(), (*[0]byte)(C.list_append), unsafe.Pointer(&handleList))
+	err := C.zpool_iter(l.Handle(), listAppend, handles.pointer())
 	l.namespaceMtx.Unlock()
 	if int(err) != 0 {
 		return nil, l.Errno()
 	}
 
-	var (
-		handles = listToSlice[*C.zpool_handle_t](handleList)
-		pools   = make([]*Pool, len(handles))
-	)
-	for i, handle := range handles {
+	var pools = make([]*Pool, handles.len())
+	for i, handle := range handles.slice() {
 		pools[i] = &Pool{handle: handle}
 	}
 	return pools, nil
