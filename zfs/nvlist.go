@@ -2,6 +2,8 @@ package zfs
 
 /*
 #include <libnvpair.h>
+
+char *MODE_W = "w";
 */
 import "C"
 
@@ -472,7 +474,7 @@ func (nvl NVList) Map() map[string]interface{} {
 }
 
 func (nvl NVList) JSON(fd uintptr) int {
-	file := C.fdopen(C.int(fd), C.CString("w"))
+	file := C.fdopen(C.int(fd), C.MODE_W)
 	defer C.fclose(file)
 	return int(C.nvlist_print_json(file, nvl.handle))
 }
