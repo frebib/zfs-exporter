@@ -2,8 +2,8 @@ package collector
 
 import (
 	"log"
-	"runtime"
 	"strconv"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -72,30 +72,31 @@ var (
 		[]string{"name", "pool", "type"},
 		nil,
 	)
-
-	datasetCollectErrors = prometheus.NewDesc(
-		"zfs_dataset_collect_errors_total",
-		"errors collecting ZFS dataset metrics",
-		[]string{"dataset"},
-		nil,
-	)
 )
 
 type DatasetCollector struct {
-	libzfs *zfs.LibZFS
+	libzfs *zfs.libZFS
 
-	datasetErrors map[string]int
+	datasetErrors *prometheus.CounterVec
 }
 
 // Describe implements prometheus.Collector.
 func (collector *DatasetCollector) Describe(descs chan<- *prometheus.Desc) {
-	descs <- datasetCollectErrors
+	collector.datasetErrors.Describe(descs)
 }
 
-func NewDatasetCollector(libzfs *zfs.LibZFS) *DatasetCollector {
+func NewDatasetCollector(libzfs *zfs.libZFS) *DatasetCollector {
 	return &DatasetCollector{
-		libzfs:        libzfs,
-		datasetErrors: make(map[string]int),
+		libzfs: libzfs,
+		datasetErrors: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: "zfs",
+				Subsystem: "dataset",
+				Name:      "collect_errors_total",
+				Help:      "errors collecting ZFS dataset metrics",
+			},
+			[]string{"dataset"},
+		),
 	}
 }
 
@@ -109,12 +110,18 @@ func (collector *DatasetCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(len(datasets))
 	for _, dataset := range datasets {
-		collector.collectDataset(ch, dataset)
-		dataset.Close()
+		go func(d *zfs.Dataset) {
+			collector.collectDataset(ch, d)
+			d.Close()
+			wg.Done()
+		}(dataset)
 	}
+	wg.Wait()
 
-	runtime.GC()
+	collector.datasetErrors.Collect(ch)
 }
 
 func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metric, dataset *zfs.Dataset) {
@@ -122,9 +129,8 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 	pool := dataset.Pool().Name()
 	typ := dataset.Type()
 
-	if _, ok := collector.datasetErrors[name]; !ok {
-		collector.datasetErrors[name] = 0
-	}
+	// Initialise error counter as 0
+	errs := collector.datasetErrors.With(prometheus.Labels{"dataset": name})
 
 	// Common properties for all dataset types (filesystems, volumes, snapshots)
 	descs := map[zfs.DatasetProperty]*prometheus.Desc{
@@ -156,9 +162,8 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 
 	vals, err := dataset.Gets(props...)
 	if err != nil {
-		collector.datasetErrors[name]++
+		errs.Inc()
 		log.Printf("error reading dataset properties: %v", err)
-
 	} else {
 		for prop, val := range vals {
 			var value float64
@@ -169,7 +174,7 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 				value, err = strconv.ParseFloat(val.Value, 10)
 				if err != nil {
 					log.Printf("error parsing property '%s' value '%s': %v", prop, val.Value, err)
-					collector.datasetErrors[name]++
+					errs.Inc()
 					continue
 				}
 
@@ -187,7 +192,7 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 				fallthrough
 
 			default:
-				collector.datasetErrors[name]++
+				errs.Inc()
 				log.Printf("unknown property value for '%s'", prop)
 				continue
 			}
@@ -198,11 +203,4 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 			)
 		}
 	}
-
-	metrics <- prometheus.MustNewConstMetric(
-		datasetCollectErrors,
-		prometheus.CounterValue,
-		float64(collector.datasetErrors[name]),
-		name,
-	)
 }

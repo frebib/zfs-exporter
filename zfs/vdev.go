@@ -221,12 +221,9 @@ func (vdt VDevTree) ScanStat() (PoolScanStat, error) {
 	var ss *C.pool_scan_stat_t
 	var count C.uint_t
 
-	scanStats := C.CString(PoolConfigScanStats)
-	defer C.free(unsafe.Pointer(scanStats))
-
 	// Here we "cheat" by unloading the uint64_t array into a scan_stat_t struct
 	// as the fields are all uint64_t and in the correct order for us already
-	ret := C.nvlist_lookup_uint64_array(vdt.nvl.Pointer(), scanStats,
+	ret := C.nvlist_lookup_uint64_array(vdt.nvl.Pointer(), C.ZPOOL_CONFIG_SCAN_STATS,
 		(**C.uint64_t)(unsafe.Pointer(&ss)), &count)
 	if ret != 0 {
 		return PoolScanStat{}, nvlistLookupError(ret)
@@ -254,12 +251,9 @@ func (vdt VDevTree) Stat() (VDevStat, error) {
 	var vs *C.struct_vdev_stat
 	var count C.uint_t
 
-	vdevStats := C.CString(PoolConfigVdevStats)
-	defer C.free(unsafe.Pointer(vdevStats))
-
 	// Here we "cheat" by unloading the uint64_t array into a vdev_stat_t struct
 	// as the fields are all uint64_t and in the correct order for us already
-	ret := C.nvlist_lookup_uint64_array(vdt.nvl.Pointer(), vdevStats,
+	ret := C.nvlist_lookup_uint64_array(vdt.nvl.Pointer(), C.ZPOOL_CONFIG_VDEV_STATS,
 		(**C.uint64_t)(unsafe.Pointer(&vs)), &count)
 	if ret != 0 {
 		return VDevStat{}, nvlistLookupError(ret)
