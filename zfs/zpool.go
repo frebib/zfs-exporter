@@ -299,13 +299,13 @@ type Pool struct {
 }
 
 func (p *Pool) Close() {
+	allPools.Delete(p.handle)
 	C.zpool_close(p.handle)
+	p.handle = nil
 }
 
-func (p Pool) LibZFS() *LibZFS {
-	return &LibZFS{
-		handle: C.zpool_get_handle(p.handle),
-	}
+func (p *Pool) LibZFS() *LibZFS {
+	return getLibZFS(C.zpool_get_handle(p.handle))
 }
 
 func (p Pool) Name() string {
@@ -400,12 +400,12 @@ func (l *LibZFS) PoolOpen(path string) (*Pool, error) {
 	csPath := C.CString(path)
 	defer C.free(unsafe.Pointer(csPath))
 
-	handle := C.zpool_open(l.Handle(), csPath)
+	handle := C.zpool_open(l.handle, csPath)
 	if handle == nil {
 		return nil, l.Errno()
 	}
 
-	return &Pool{handle: handle}, nil
+	return getPool(handle), nil
 }
 
 type Pools []*Pool
@@ -413,7 +413,6 @@ type Pools []*Pool
 func (ps Pools) Close() {
 	for _, p := range ps {
 		p.Close()
-		p.handle = nil
 	}
 }
 
@@ -424,7 +423,7 @@ func (l *LibZFS) PoolOpenAll() (Pools, error) {
 	var handles list[*C.zpool_handle_t]
 
 	l.namespaceMtx.Lock()
-	err := C.zpool_iter(l.Handle(), listAppend, handles.pointer())
+	err := C.zpool_iter(l.handle, listAppend, handles.pointer())
 	l.namespaceMtx.Unlock()
 	if int(err) != 0 {
 		return nil, l.Errno()
@@ -432,7 +431,7 @@ func (l *LibZFS) PoolOpenAll() (Pools, error) {
 
 	var pools = make([]*Pool, handles.len())
 	for i, handle := range handles.slice() {
-		pools[i] = &Pool{handle: handle}
+		pools[i] = getPool(handle)
 	}
 	return pools, nil
 }

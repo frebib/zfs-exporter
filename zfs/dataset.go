@@ -175,14 +175,14 @@ type Dataset struct {
 	typ    DatasetType
 }
 
-func (d Dataset) Close() {
+func (d *Dataset) Close() {
+	allDatasets.Delete(d.handle)
 	C.zfs_close(d.handle)
+	d.handle = nil
 }
 
-func (d Dataset) LibZFS() *LibZFS {
-	return &LibZFS{
-		handle: C.zfs_get_handle(d.handle),
-	}
+func (d *Dataset) LibZFS() *LibZFS {
+	return getLibZFS(C.zfs_get_handle(d.handle))
 }
 
 func (d *Dataset) Name() string {
@@ -203,7 +203,7 @@ func (d *Dataset) Type() DatasetType {
 }
 
 func (d *Dataset) Pool() *Pool {
-	return &Pool{handle: C.zfs_get_pool_handle(d.handle)}
+	return getPool(C.zfs_get_pool_handle(d.handle))
 }
 
 func (d Dataset) Get(prop DatasetProperty) (*DatasetPropertyValue, error) {
@@ -305,9 +305,7 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 	return datasets, nil
 }
 
-func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) []*Dataset {
-	var datasets []*Dataset
-
+func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) (datasets []*Dataset) {
 	for _, handle := range handles {
 		if handle == nil {
 			panic("nil zfs_handle_t")
@@ -321,9 +319,8 @@ func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) []*Dataset {
 			continue
 		}
 
-		datasets = append(datasets, &Dataset{handle: handle})
+		datasets = append(datasets, getDataset(handle))
 	}
-
 	return datasets
 }
 
@@ -332,12 +329,12 @@ func (l *LibZFS) DatasetOpen(path string) (*Dataset, error) {
 	csPath := C.CString(path)
 	defer C.free(unsafe.Pointer(csPath))
 
-	handle := C.zfs_open(l.Handle(), csPath, C.ZFS_TYPE_DATASET)
+	handle := C.zfs_open(l.handle, csPath, C.ZFS_TYPE_DATASET)
 	if handle == nil {
 		return nil, l.Errno()
 	}
 
-	return &Dataset{handle: handle}, nil
+	return getDataset(handle), nil
 }
 
 // DatasetOpenAll recursive get handles to all available datasets on system
@@ -347,14 +344,14 @@ func (l *LibZFS) DatasetOpenAll(types DatasetType, depth int) ([]*Dataset, error
 	defer handles.clear()
 
 	l.namespaceMtx.Lock()
-	ret := C.zfs_iter_root(l.Handle(), listAppend, handles.pointer())
+	ret := C.zfs_iter_root(l.handle, listAppend, handles.pointer())
 	l.namespaceMtx.Unlock()
 	if int(ret) != 0 {
 		return nil, fmt.Errorf("zfs_iter_root returned %d", int(ret))
 	}
 
 	roots := datasetInitAll(handles.slice(), types)
-	datasets := append([]*Dataset{}, roots...)
+	var datasets = roots[:]
 
 	if depth == -1 || depth > 0 {
 		if depth > 0 {
