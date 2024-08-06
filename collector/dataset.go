@@ -3,7 +3,6 @@ package collector
 import (
 	"log"
 	"runtime"
-	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -163,32 +162,15 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 		for prop, val := range vals {
 			var value float64
 
-		propType:
-			switch prop.Type() {
-			case zfs.PropertyTypeNumber:
-				value, err = strconv.ParseFloat(val.Value, 10)
-				if err != nil {
-					log.Printf("error parsing property '%s' value '%s': %v", prop, val.Value, err)
-					collector.datasetErrors[name]++
-					continue
-				}
-
-			case zfs.PropertyTypeIndex:
-				switch prop {
-				case zfs.DatasetPropReadonly:
-					if val.Value == "on" {
-						value = 1
-					} else {
-						value = 0
-					}
-					break propType
-				}
-
-				fallthrough
+			switch v := val.(type) {
+			case *zfs.DatasetPropertyNumber:
+				value = float64(v.Value())
+			case *zfs.DatasetPropertyIndex:
+				value = float64(v.Value())
 
 			default:
 				collector.datasetErrors[name]++
-				log.Printf("unknown property value for '%s'", prop)
+				log.Printf("unknown property type for '%s'", prop)
 				continue
 			}
 

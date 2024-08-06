@@ -160,8 +160,7 @@ const (
 )
 
 func (dp DatasetProperty) String() string {
-	ptr := C.zfs_prop_to_name(C.zfs_prop_t(dp))
-	return C.GoString(ptr)
+	return C.GoString(C.zfs_prop_to_name(C.zfs_prop_t(dp)))
 }
 
 func (dp DatasetProperty) Type() PropertyType {
@@ -197,43 +196,81 @@ func (d *Dataset) Pool() *Pool {
 	return d.LibZFS().getPool(C.zfs_get_pool_handle(d.handle))
 }
 
-func (d Dataset) Get(prop DatasetProperty) (*DatasetPropertyValue, error) {
-	var source C.int
-	var statBuf = make([]byte, 1024)
-	var propBuf = make([]byte, 4096)
+func (d *Dataset) Get(prop DatasetProperty) (DatasetPropertyValue, error) {
+	var ret, src C.int
 
-	/*
-		* Retrieve a property from the given object.  If 'literal' is specified, then
-		* numbers are left as exact values.  Otherwise, numbers are converted to a
-		* human-readable form.
-		*
-		* Returns 0 on success, or -1 on error.
+	switch prop.Type() {
+	case PropertyTypeNumber:
+		var value uint64
+		ret = C.zfs_prop_get_numeric(
+			d.handle, C.zfs_prop_t(prop),
+			(*C.uint64_t)(unsafe.Pointer(&value)),
+			(*C.zprop_source_t)(unsafe.Pointer(&src)),
+			nil, 0,
+		)
+		if ret != 0 {
+			return nil, d.LibZFS().Errno()
+		}
+		return &DatasetPropertyNumber{
+			property: prop,
+			source:   PropertySource(src),
+			value:    value,
+		}, nil
 
-		int zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf,
-			size_t proplen, zprop_source_t *src, char *statbuf, size_t statlen, boolean_t literal)
-	*/
-	ret := C.zfs_prop_get(
-		d.handle, C.zfs_prop_t(prop),
-		(*C.char)(unsafe.Pointer(&propBuf[0])), 4096,
-		(*C.zprop_source_t)(unsafe.Pointer(&source)),
-		(*C.char)(unsafe.Pointer(&statBuf[0])), 1024,
-		C.B_TRUE,
-	)
+	case PropertyTypeIndex:
+		var value uint64
+		ret = C.zfs_prop_get_numeric(
+			d.handle, C.zfs_prop_t(prop),
+			(*C.uint64_t)(unsafe.Pointer(&value)),
+			(*C.zprop_source_t)(unsafe.Pointer(&src)),
+			nil, 0,
+		)
+		if ret != 0 {
+			return nil, d.LibZFS().Errno()
+		}
+		return &DatasetPropertyIndex{
+			property: prop,
+			source:   PropertySource(src),
+			value:    value,
+		}, nil
 
-	if ret != 0 {
-		return nil, d.LibZFS().Errno()
+	case PropertyTypeString:
+		var propBuf = make([]byte, C.ZFS_MAXPROPLEN)
+
+		/*
+			* Retrieve a property from the given object.  If 'literal' is specified, then
+			* numbers are left as exact values.  Otherwise, numbers are converted to a
+			* human-readable form.
+			*
+			* Returns 0 on success, or -1 on error.
+
+			int zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf,
+				size_t proplen, zprop_source_t *src, char *statbuf, size_t statlen, boolean_t literal)
+		*/
+		ret = C.zfs_prop_get(
+			d.handle, C.zfs_prop_t(prop),
+			(*C.char)(unsafe.Pointer(&propBuf[0])), (C.ulong)(len(propBuf)),
+			(*C.zprop_source_t)(unsafe.Pointer(&src)),
+			nil, 0,
+			C.B_TRUE,
+		)
+
+		if ret != 0 {
+			return nil, d.LibZFS().Errno()
+		}
+
+		return &DatasetPropertyString{
+			property: prop,
+			source:   PropertySource(src),
+			value:    string(propBuf[:bytes.IndexByte(propBuf, 0)]),
+		}, nil
 	}
 
-	return &DatasetPropertyValue{
-		Property: prop,
-		Source:   PropertySource(source),
-		Inherit:  string(statBuf[:bytes.IndexByte(statBuf, 0)]),
-		Value:    string(propBuf[:bytes.IndexByte(propBuf, 0)]),
-	}, nil
+	panic("unknown property type")
 }
 
-func (d Dataset) Gets(props ...DatasetProperty) (map[DatasetProperty]*DatasetPropertyValue, error) {
-	vals := make(map[DatasetProperty]*DatasetPropertyValue, len(props))
+func (d *Dataset) Gets(props ...DatasetProperty) (map[DatasetProperty]DatasetPropertyValue, error) {
+	vals := make(map[DatasetProperty]DatasetPropertyValue, len(props))
 
 	for _, prop := range props {
 		val, err := d.Get(prop)

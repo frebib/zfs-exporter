@@ -1,7 +1,13 @@
 package zfs
 
+/*
+#include <stdlib.h>
+#include <libzfs.h>
+*/
+import "C"
 import (
 	"strings"
+	"unsafe"
 )
 
 type PropertySource int
@@ -59,10 +65,87 @@ const (
 	PropertyTypeIndex                      /* numeric value indexed by string */
 )
 
-// DatasetPropertyValue ZFS dataset property value
-type DatasetPropertyValue struct {
-	Property DatasetProperty
-	Source   PropertySource
-	Inherit  string
-	Value    string
+type DatasetPropertyValue interface {
+	Type() PropertyType
+	Property() DatasetProperty
+	Source() PropertySource
+}
+
+type DatasetPropertyNumber struct {
+	property DatasetProperty
+	source   PropertySource
+	value    uint64
+}
+
+func (d DatasetPropertyNumber) Type() PropertyType {
+	return PropertyTypeNumber
+}
+
+func (d DatasetPropertyNumber) Property() DatasetProperty {
+	return d.property
+}
+
+func (d DatasetPropertyNumber) Source() PropertySource {
+	return d.source
+}
+
+func (d DatasetPropertyNumber) Value() uint64 {
+	return d.value
+}
+
+type DatasetPropertyIndex struct {
+	property DatasetProperty
+	source   PropertySource
+	value    uint64
+}
+
+func (d DatasetPropertyIndex) Type() PropertyType {
+	return PropertyTypeIndex
+}
+
+func (d DatasetPropertyIndex) Property() DatasetProperty {
+	return d.property
+}
+
+func (d DatasetPropertyIndex) Source() PropertySource {
+	return d.source
+}
+
+func (d DatasetPropertyIndex) Name() string {
+	var cstr *C.char
+	ret := C.zfs_prop_index_to_string(
+		(C.zfs_prop_t)(d.property),
+		(C.uint64_t)(d.value),
+		(**C.char)(unsafe.Pointer(&cstr)),
+	)
+	if ret != 0 {
+		panic("womp")
+	}
+	return C.GoString(cstr)
+}
+
+func (d DatasetPropertyIndex) Value() uint64 {
+	return d.value
+}
+
+type DatasetPropertyString struct {
+	property DatasetProperty
+	source   PropertySource
+	value    string
+}
+
+func (d DatasetPropertyString) Type() PropertyType {
+	return PropertyTypeString
+}
+
+func (d DatasetPropertyString) Property() DatasetProperty {
+	return d.property
+}
+
+func (d DatasetPropertyString) Source() PropertySource {
+	return d.source
+}
+
+func (d DatasetPropertyString) Value() string {
+	return d.value
 }
