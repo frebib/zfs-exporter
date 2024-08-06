@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	kitlog "github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/exporter-toolkit/web"
 
 	"github.com/frebib/zfs-exporter/collector"
@@ -45,6 +47,21 @@ func main() {
 	registry.MustRegister(version.NewCollector("zfs"))
 	registry.MustRegister(collector.NewZpoolCollector(libzfs))
 	registry.MustRegister(collector.NewDatasetCollector(libzfs))
+
+	args := flag.Args()
+	if len(args) == 1 && args[0] == "once" {
+		metrics, err := registry.Gather()
+		if err != nil {
+			panic(err)
+		}
+		for _, mf := range metrics {
+			_, err = expfmt.MetricFamilyToText(os.Stdout, mf)
+			if err != nil {
+				panic(err)
+			}
+		}
+		return
+	}
 
 	router := http.NewServeMux()
 	router.Handle(*metricsPath, promhttp.HandlerFor(registry, opts))

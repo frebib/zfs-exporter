@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/go-kit/log v0.2.1
 	github.com/prometheus/client_golang v1.19.1
+	github.com/prometheus/common v0.55.0
 	github.com/prometheus/exporter-toolkit v0.11.0
 	github.com/puzpuzpuz/xsync/v3 v3.4.0
 )
@@ -18,7 +19,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	golang.org/x/crypto v0.25.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
