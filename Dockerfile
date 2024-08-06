@@ -1,6 +1,10 @@
 FROM golang:alpine3.20 AS build
 
-RUN apk add gcc libc-dev zfs-dev
+RUN apk add \
+        gcc \
+        git \
+        libc-dev \
+        zfs-dev
 
 WORKDIR /build
 
