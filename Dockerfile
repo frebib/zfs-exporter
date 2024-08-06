@@ -5,7 +5,7 @@ RUN apk add gcc libc-dev zfs-dev
 WORKDIR /build
 
 ADD . .
-RUN go build -v
+RUN go build -v -trimpath
 
 
 FROM alpine:3.20
