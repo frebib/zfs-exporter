@@ -5,8 +5,6 @@ package zfs
 #include <zfs_prop.h>
 #include <libintl.h>
 #include <libuutil.h>
-
-extern int datasetSlice(zfs_handle_t *h, void *ptr);
 */
 import "C"
 
@@ -211,7 +209,7 @@ func (d *Dataset) Pool() *Pool {
 func (d Dataset) Get(prop DatasetProperty) (*DatasetPropertyValue, error) {
 	var source C.int
 	var statBuf = make([]byte, 1024)
-	var propBuf = make([]byte, 4096) //create my buffer
+	var propBuf = make([]byte, 4096)
 
 	/*
 		* Retrieve a property from the given object.  If 'literal' is specified, then
@@ -224,9 +222,11 @@ func (d Dataset) Get(prop DatasetProperty) (*DatasetPropertyValue, error) {
 			size_t proplen, zprop_source_t *src, char *statbuf, size_t statlen, boolean_t literal)
 	*/
 	ret := C.zfs_prop_get(
-		d.handle, C.zfs_prop_t(prop), (*C.char)(unsafe.Pointer(&propBuf[0])),
-		4096, (*C.zprop_source_t)(unsafe.Pointer(&source)),
-		(*C.char)(unsafe.Pointer(&statBuf[0])), 1024, booleanT(true),
+		d.handle, C.zfs_prop_t(prop),
+		(*C.char)(unsafe.Pointer(&propBuf[0])), 4096,
+		(*C.zprop_source_t)(unsafe.Pointer(&source)),
+		(*C.char)(unsafe.Pointer(&statBuf[0])), 1024,
+		C.B_TRUE,
 	)
 
 	if ret != 0 {
@@ -240,6 +240,7 @@ func (d Dataset) Get(prop DatasetProperty) (*DatasetPropertyValue, error) {
 		Value:    string(propBuf[:bytes.IndexByte(propBuf, 0)]),
 	}, nil
 }
+
 func (d Dataset) Gets(props ...DatasetProperty) (map[DatasetProperty]*DatasetPropertyValue, error) {
 	vals := make(map[DatasetProperty]*DatasetPropertyValue, len(props))
 
@@ -259,37 +260,34 @@ func (d Dataset) Gets(props ...DatasetProperty) (map[DatasetProperty]*DatasetPro
 }
 
 func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
-	var handles []*C.zfs_handle_t
-	handlesPtr := unsafe.Pointer(&handles)
-
-	// cgo has silly type restrictions.
-	// This is the only way I could make it compile
-	callback := (*[0]byte)(C.datasetSlice)
+	var handles list[*C.zfs_handle_t]
+	defer handles.clear()
 
 	if types&DatasetTypeFilesystem == DatasetTypeFilesystem {
-		ret := C.zfs_iter_filesystems(d.handle, callback, handlesPtr)
+		ret := C.zfs_iter_filesystems(d.handle, listAppend, handles.pointer())
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
-		ret := C.zfs_iter_snapshots(d.handle, C.B_TRUE, callback, handlesPtr, 0, 0)
+		ret := C.zfs_iter_snapshots(d.handle, C.B_TRUE, listAppend, handles.pointer(), 0, 0)
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 	if types&DatasetTypeBookmark == DatasetTypeBookmark {
-		ret := C.zfs_iter_bookmarks(d.handle, callback, handlesPtr)
+		ret := C.zfs_iter_bookmarks(d.handle, listAppend, handles.pointer())
 		if int(ret) != 0 {
 			return nil, d.LibZFS().Errno()
 		}
 	}
 
-	datasets, err := datasetInitAll(handles, types)
-	if err != nil {
-		return nil, err
+	// Shortcut
+	if handles.len() == 0 {
+		return nil, nil
 	}
 
+	datasets := datasetInitAll(handles.slice(), types)
 	if depth == -1 || depth > 0 {
 		if depth > 0 {
 			depth--
@@ -307,18 +305,7 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 	return datasets, nil
 }
 
-//export datasetSlice
-// datasetSlice appends the passed zfs_handle_t to a slice of []*C.zfs_handle_t
-// passed in via ptr of type unsafe.Pointer(*[]*C.zfs_handle_t). This function
-// is intended to be used as a callback to the zfs_iter_* suite of libzfs
-// functions, matching signature: int (*zfs_iter_f)(zfs_handle_t*, void*)
-func datasetSlice(handle *C.zfs_handle_t, ptr unsafe.Pointer) C.int {
-	list := (*[]*C.zfs_handle_t)(ptr)
-	*list = append(*list, handle)
-	return 0
-}
-
-func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) ([]*Dataset, error) {
+func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) []*Dataset {
 	var datasets []*Dataset
 
 	for _, handle := range handles {
@@ -337,7 +324,7 @@ func datasetInitAll(handles []*C.zfs_handle_t, types DatasetType) ([]*Dataset, e
 		datasets = append(datasets, &Dataset{handle: handle})
 	}
 
-	return datasets, nil
+	return datasets
 }
 
 // DatasetOpen opens a single dataset
@@ -356,20 +343,17 @@ func (l *LibZFS) DatasetOpen(path string) (*Dataset, error) {
 // DatasetOpenAll recursive get handles to all available datasets on system
 // (file-systems, volumes or snapshots).
 func (l *LibZFS) DatasetOpenAll(types DatasetType, depth int) ([]*Dataset, error) {
-	var handles []*C.zfs_handle_t
+	var handles list[*C.zfs_handle_t]
+	defer handles.clear()
 
 	l.namespaceMtx.Lock()
-	ret := C.zfs_iter_root(l.Handle(), (*[0]byte)(C.datasetSlice), unsafe.Pointer(&handles))
+	ret := C.zfs_iter_root(l.Handle(), listAppend, handles.pointer())
 	l.namespaceMtx.Unlock()
 	if int(ret) != 0 {
-		return nil, l.Errno()
+		return nil, fmt.Errorf("zfs_iter_root returned %d", int(ret))
 	}
 
-	roots, err := datasetInitAll(handles, types)
-	if err != nil {
-		return nil, err
-	}
-
+	roots := datasetInitAll(handles.slice(), types)
 	datasets := append([]*Dataset{}, roots...)
 
 	if depth == -1 || depth > 0 {

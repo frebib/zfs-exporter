@@ -70,13 +70,6 @@ func (s VDevState) String() string {
 // VDevAux - vdev aux states
 type VDevAux uint64
 
-func booleanT(b bool) (r C.boolean_t) {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // vdev aux states.  When a vdev is in the VDevStateCantOpen state, the aux field
 // of the vdev stats structure uses these constants to distinguish why.
 const (

@@ -1,11 +1,10 @@
 package zfs
 
 /*
+#include "list.h"
 #include <stdlib.h>
 #include <libzfs.h>
 #include <zfs_prop.h>
-
-extern int poolSlice(zpool_handle_t *h, void *ptr);
 */
 import "C"
 
@@ -366,7 +365,7 @@ func (p *Pool) VDevTree() (VDevTree, error) {
 
 func (p *Pool) Get(prop PoolProperty) (*PoolPropertyValue, error) {
 	var source C.int
-	var propBuf = make([]byte, 4096) //create my buffer
+	var propBuf = make([]byte, 4096)
 
 	/*
 		* Retrieve a property from the given object.  If 'literal' is specified, then
@@ -379,8 +378,10 @@ func (p *Pool) Get(prop PoolProperty) (*PoolPropertyValue, error) {
 			size_t proplen, zprop_source_t *src, char *statbuf, size_t statlen, boolean_t literal)
 	*/
 	ret := C.zpool_get_prop(
-		p.handle, C.zpool_prop_t(prop), (*C.char)(unsafe.Pointer(&propBuf[0])),
-		4096, (*C.zprop_source_t)(unsafe.Pointer(&source)), booleanT(true),
+		p.handle, C.zpool_prop_t(prop),
+		(*C.char)(unsafe.Pointer(&propBuf[0])), 4096,
+		(*C.zprop_source_t)(unsafe.Pointer(&source)),
+		C.B_TRUE,
 	)
 
 	if ret != 0 {
@@ -392,20 +393,6 @@ func (p *Pool) Get(prop PoolProperty) (*PoolPropertyValue, error) {
 		Source:   PropertySource(source),
 		Value:    string(propBuf[:bytes.IndexByte(propBuf, 0)]),
 	}, nil
-}
-
-// poolSlice appends the passed zfs_handle_t to a slice of []*Pool passed
-// in via ptr, which is expected to be an unsafe.Pointer(*[]*Pool). This
-// function is intended to be used as a callback to the zfs_iter_* suite of
-// libzfs functions, matching signature: int (*zfs_iter_f)(zfs_handle_t*, void*)
-//
-//export poolSlice
-func poolSlice(handle *C.zpool_handle_t, ptr unsafe.Pointer) C.int {
-	pool := &Pool{handle: handle}
-	list := (*[]*Pool)(ptr)
-	*list = append(*list, pool)
-
-	return 0
 }
 
 // PoolOpen opens a single dataset
@@ -434,14 +421,20 @@ func (ps Pools) Close() {
 // Returns array of Pool handlers, each have to be closed after not needed
 // anymore. Call Pool.Close() method.
 func (l *LibZFS) PoolOpenAll() (Pools, error) {
-	var pools Pools
+	var handles list[*C.zpool_handle_t]
+	defer handles.clear()
 
 	l.namespaceMtx.Lock()
-	err := C.zpool_iter(l.Handle(), (*[0]byte)(C.poolSlice), unsafe.Pointer(&pools))
+	err := C.zpool_iter(l.Handle(), listAppend, handles.pointer())
 	l.namespaceMtx.Unlock()
 	if int(err) != 0 {
 		return nil, l.Errno()
 	}
 
+	var pools = make([]*Pool, handles.len())
+	_ = handles.iter(func(i int, handle *C.zpool_handle_t) error {
+		pools[i] = &Pool{handle: handle}
+		return nil
+	})
 	return pools, nil
 }
