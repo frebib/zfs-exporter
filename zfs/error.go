@@ -113,9 +113,8 @@ func (e Error) Error() string {
 }
 
 func (l *LibZFS) Errno() error {
-	handle := l.Handle()
-	errno := C.libzfs_errno(handle)
-	message := C.libzfs_error_description(handle)
+	errno := C.libzfs_errno(l.handle)
+	message := C.libzfs_error_description(l.handle)
 	return &Error{
 		errno:   int(errno),
 		message: C.GoString(message),

@@ -15,21 +15,18 @@ import (
 	"errors"
 	"sync"
 	"syscall"
+
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
-// include/libzfs_impl.h
-type LibZFS struct {
-	handle       *C.libzfs_handle_t
-	namespaceMtx sync.Mutex
-}
-
-func (l *LibZFS) Handle() *C.libzfs_handle_t {
-	return l.handle
-}
-
-func (l *LibZFS) Close() {
-	C.libzfs_fini(l.handle)
-}
+// Persist global mappings between C pointers and their Golang counterparts to
+// ensure we only ever have a 1:1 mapping. Locking and memory destruction relies
+// upon a strict and persistent object lifetime.
+var (
+	libzfs      = xsync.NewMapOf[*C.libzfs_handle_t, *LibZFS]()
+	allPools    = xsync.NewMapOf[*C.zpool_handle_t, *Pool]()
+	allDatasets = xsync.NewMapOf[*C.zfs_handle_t, *Dataset]()
+)
 
 func New() (*LibZFS, error) {
 	handle, err := C.libzfs_init()
@@ -37,5 +34,30 @@ func New() (*LibZFS, error) {
 		errno := err.(syscall.Errno)
 		return nil, errors.New(C.GoString(C.libzfs_error_init(C.int(errno))))
 	}
-	return &LibZFS{handle: handle}, nil
+	l := &LibZFS{handle: handle}
+	libzfs.Store(handle, l)
+	return l, nil
+}
+
+type LibZFS struct {
+	// include/libzfs_impl.h
+	handle *C.libzfs_handle_t
+	lock   sync.Mutex
+}
+
+func (l *LibZFS) Close() {
+	handle := l.handle
+	l.handle = nil
+	libzfs.Delete(handle)
+	C.libzfs_fini(handle)
+}
+
+func (l *LibZFS) getPool(handle *C.zpool_handle_t) *Pool {
+	pool, _ := allPools.LoadOrStore(handle, &Pool{handle: handle})
+	return pool
+}
+
+func (l *LibZFS) getDataset(handle *C.zfs_handle_t) *Dataset {
+	dataset, _ := allDatasets.LoadOrStore(handle, &Dataset{handle: handle})
+	return dataset
 }
