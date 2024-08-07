@@ -300,10 +300,19 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
-		ret := C.zfs_iter_snapshots(d.handle, C.B_FALSE, listAppend, handles.pointer(), 0, 0)
-		if int(ret) != 0 {
-			_ = handles.iter(datasetClose)
-			return nil, l.Errno()
+		tries := 0
+		for {
+			ret := C.zfs_iter_snapshots(d.handle, C.B_FALSE, listAppend, handles.pointer(), 0, 0)
+			if ret != 0 {
+				// Try again if we get EINTR; it's most likely a random signal
+				if tries < 3 && C.libzfs_errno(l.handle) == C.EZFS_INTR {
+					tries++
+					continue
+				}
+				_ = handles.iter(datasetClose)
+				return nil, l.Errno()
+			}
+			break
 		}
 	}
 	if types&DatasetTypeBookmark == DatasetTypeBookmark {
