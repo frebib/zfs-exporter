@@ -291,22 +291,26 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 	var handles list[*C.zfs_handle_t]
 	defer handles.clear()
 
+	l := d.LibZFS()
 	if types&DatasetTypeFilesystem == DatasetTypeFilesystem {
 		ret := C.zfs_iter_filesystems(d.handle, listAppend, handles.pointer())
 		if int(ret) != 0 {
-			return nil, d.LibZFS().Errno()
+			_ = handles.iter(datasetClose)
+			return nil, l.Errno()
 		}
 	}
 	if types&DatasetTypeSnapshot == DatasetTypeSnapshot {
 		ret := C.zfs_iter_snapshots(d.handle, C.B_FALSE, listAppend, handles.pointer(), 0, 0)
 		if int(ret) != 0 {
-			return nil, d.LibZFS().Errno()
+			_ = handles.iter(datasetClose)
+			return nil, l.Errno()
 		}
 	}
 	if types&DatasetTypeBookmark == DatasetTypeBookmark {
 		ret := C.zfs_iter_bookmarks(d.handle, listAppend, handles.pointer())
 		if int(ret) != 0 {
-			return nil, d.LibZFS().Errno()
+			_ = handles.iter(datasetClose)
+			return nil, l.Errno()
 		}
 	}
 
@@ -324,6 +328,9 @@ func (d *Dataset) Children(types DatasetType, depth int) ([]*Dataset, error) {
 			// recurse
 			children, err := d.Children(types, depth)
 			if err != nil {
+				for _, d := range datasets {
+					d.Close()
+				}
 				return nil, err
 			}
 			datasets = append(datasets, children...)
@@ -388,6 +395,9 @@ func (l *LibZFS) DatasetOpenAll(types DatasetType, depth int) ([]*Dataset, error
 		for _, root := range roots {
 			children, err := root.Children(types, depth)
 			if err != nil {
+				for _, d := range datasets {
+					d.Close()
+				}
 				return nil, err
 			}
 			datasets = append(datasets, children...)
@@ -395,4 +405,9 @@ func (l *LibZFS) DatasetOpenAll(types DatasetType, depth int) ([]*Dataset, error
 	}
 
 	return datasets, nil
+}
+
+func datasetClose(_ int, handle *C.zfs_handle_t) error {
+	C.zfs_close(handle)
+	return nil
 }
