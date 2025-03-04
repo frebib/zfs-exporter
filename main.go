@@ -5,10 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
-	kitlog "github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/collectors/version"
@@ -74,7 +74,7 @@ func main() {
 	})
 
 	server := http.Server{Handler: router}
-	logger := kitlog.NewLogfmtLogger(log.Writer())
+	logger := slog.New(slog.NewTextHandler(log.Writer(), &slog.HandlerOptions{Level: slog.LevelInfo}))
 	config := web.FlagConfig{
 		WebListenAddresses: &[]string{*listenAddress},
 		WebConfigFile:      webConfigFile,
