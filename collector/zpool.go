@@ -104,6 +104,12 @@ var (
 		[]string{"pool"},
 		nil,
 	)
+	poolScrubPauseTime = prometheus.NewDesc(
+		"zfs_pool_scrub_paused_timestamp",
+		"Unix timestamp of when the scrub was paused. Zero indicates that the scrub is not paused",
+		[]string{"pool"},
+		nil,
+	)
 	poolScrubStartTimeDesc = prometheus.NewDesc(
 		"zfs_pool_last_scrub_start_timestamp",
 		"Unix timestamp of the start of the last scrub",
@@ -251,6 +257,12 @@ func (collector *ZpoolCollector) collectPool(metrics chan<- prometheus.Metric, p
 				poolScrubStatus,
 				prometheus.GaugeValue,
 				float64(scan.State),
+				name,
+			)
+			metrics <- prometheus.MustNewConstMetric(
+				poolScrubPauseTime,
+				prometheus.GaugeValue,
+				float64(scan.PassScrubPause.Unix()),
 				name,
 			)
 			metrics <- prometheus.MustNewConstMetric(
