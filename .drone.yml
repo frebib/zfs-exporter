@@ -5,17 +5,54 @@ name: default
 
 steps:
 - name: docker build
+  image: registry.spritsail.io/spritsail/docker-build
   pull: always
-  image: spritsail/docker-build
 
-- name: docker publish
+- name: docker publish spritsail
+  image: registry.spritsail.io/spritsail/docker-publish
   pull: always
-  image: spritsail/docker-publish
   settings:
+    registry: registry.spritsail.io
+    login: {from_secret: spritsail_login}
     repo: frebib/zfs-exporter
-    tags:
+    tags: &tags
     - latest
+    delete: no
+  depends_on:
+    - docker build
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: docker publish ghcr
+  image: registry.spritsail.io/spritsail/docker-publish
+  pull: never
+  settings:
+    registry: ghcr.io
+    login: {from_secret: ghcr_login}
+    repo: frebib/zfs-exporter
+    tags: *tags
+    delete: no
+  depends_on:
+    - docker build
+  when:
+    branch:
+    - master
+    event:
+    - push
+
+- name: docker publish docker hub
+  image: registry.spritsail.io/spritsail/docker-publish
+  pull: never
+  settings:
     login: {from_secret: docker_login}
+    repo: frebib/zfs-exporter
+    tags: *tags
+  depends_on:
+    - docker publish spritsail
+    - docker publish ghcr
   when:
     branch:
     - master
@@ -24,6 +61,6 @@ steps:
 
 ---
 kind: signature
-hmac: 762f41c52c231a6f2f49d5b5b4502be641c1d538120032d14f1f4f8ed70c19dd
+hmac: a317577f2fbeddc2905198fd6ca21b706d2773e7ff12067d00f3305d6fd75892
 
 ...
