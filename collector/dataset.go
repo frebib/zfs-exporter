@@ -3,6 +3,7 @@ package collector
 import (
 	"log"
 	"runtime"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -10,73 +11,65 @@ import (
 )
 
 var (
+	datasetLabels = []string{"name", "pool", "type", "dataset"}
+
 	datasetCreatedAt = prometheus.NewDesc(
 		"zfs_dataset_created_timestamp_seconds",
 		"Unix timestamp representing the created date/time of the dataset",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 	datasetUsedBytes = prometheus.NewDesc(
 		"zfs_dataset_used_bytes",
 		"space used by dataset and all its descendents in bytes",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetRefBytes = prometheus.NewDesc(
 		"zfs_dataset_referenced_bytes",
 		"",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetAvailBytes = prometheus.NewDesc(
 		"zfs_dataset_available_bytes",
 		"space available in the dataset in bytes",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetWrittenBytes = prometheus.NewDesc(
 		"zfs_dataset_written_bytes",
 		"",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetQuotaBytes = prometheus.NewDesc(
 		"zfs_dataset_quota_bytes",
 		"",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetVolsizeBytes = prometheus.NewDesc(
 		"zfs_volume_size_bytes",
 		"size in bytes of a zfs volume",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetReadOnly = prometheus.NewDesc(
 		"zfs_dataset_readonly",
 		"",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetCompressRatio = prometheus.NewDesc(
 		"zfs_dataset_compress_ratio",
 		"",
-		[]string{"name", "pool", "type"},
-		nil,
+		datasetLabels, nil,
 	)
 
 	datasetCollectErrors = prometheus.NewDesc(
 		"zfs_dataset_collect_errors_total",
 		"errors collecting ZFS dataset metrics",
-		[]string{"dataset"},
-		nil,
+		[]string{"dataset"}, nil,
 	)
 )
 
@@ -120,6 +113,10 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 	name := dataset.Name()
 	pool := dataset.Pool().Name()
 	typ := dataset.Type()
+	dsname := name
+	if typ == zfs.DatasetTypeSnapshot {
+		dsname = name[:strings.Index(name, "@")]
+	}
 
 	if _, ok := collector.datasetErrors[name]; !ok {
 		collector.datasetErrors[name] = 0
@@ -176,7 +173,7 @@ func (collector *DatasetCollector) collectDataset(metrics chan<- prometheus.Metr
 
 			metrics <- prometheus.MustNewConstMetric(
 				descs[prop], prometheus.GaugeValue,
-				value, name, pool, typ.String(),
+				value, name, pool, typ.String(), dsname,
 			)
 		}
 	}
