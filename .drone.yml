@@ -8,7 +8,7 @@ steps:
   image: registry.spritsail.io/spritsail/docker-build
   pull: always
 
-- name: docker publish spritsail
+- name: docker publish
   image: registry.spritsail.io/spritsail/docker-publish
   pull: always
   settings:
@@ -26,41 +26,8 @@ steps:
     event:
     - push
 
-- name: docker publish ghcr
-  image: registry.spritsail.io/spritsail/docker-publish
-  pull: never
-  settings:
-    registry: ghcr.io
-    login: {from_secret: ghcr_login}
-    repo: frebib/zfs-exporter
-    tags: *tags
-    delete: no
-  depends_on:
-    - docker build
-  when:
-    branch:
-    - master
-    event:
-    - push
-
-- name: docker publish docker hub
-  image: registry.spritsail.io/spritsail/docker-publish
-  pull: never
-  settings:
-    login: {from_secret: docker_login}
-    repo: frebib/zfs-exporter
-    tags: *tags
-  depends_on:
-    - docker publish spritsail
-    - docker publish ghcr
-  when:
-    branch:
-    - master
-    event:
-    - push
-
 ---
 kind: signature
-hmac: a317577f2fbeddc2905198fd6ca21b706d2773e7ff12067d00f3305d6fd75892
+hmac: d436218dc12394b5b73b9f006cf021e81073f2e6b12bbb15a2e5f34d28146996
 
 ...
