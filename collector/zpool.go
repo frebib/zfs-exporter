@@ -3,6 +3,7 @@ package collector
 import (
 	"errors"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 
@@ -245,6 +246,14 @@ func (collector *ZpoolCollector) collectPool(metrics chan<- prometheus.Metric, p
 		}
 	}
 
+	for _, spare := range vdt.Spares() {
+		err = collector.collectSpares(metrics, spare, name)
+		if err != nil {
+			log.Printf("unable to read spare '%s' for pool '%s': %v", spare.Name(), name, err)
+			collector.poolErrors[name]++
+		}
+	}
+
 	scan, err := vdt.ScanStat()
 	if err != nil {
 		if !errors.Is(err, zfs.ErrNotFound) {
@@ -314,6 +323,14 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 	} else if isLog > 0 {
 		// Falsify the "log" device type for log disks
 		devType = zfs.VDevTypeLog
+	}
+
+	isSpare, err := vdt.Config().LookupUint64(zfs.PoolConfigIsSpare)
+	if err != nil && !errors.Is(err, zfs.ErrNotFound) {
+		panic(err)
+	} else if isSpare > 0 {
+		// Falsify the "spare" device type for spare disks
+		devType = zfs.VDevTypeSpare
 	}
 
 	typ := string(devType)
@@ -393,6 +410,27 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (collector *ZpoolCollector) collectSpares(ch chan<- prometheus.Metric, vdt zfs.VDevTree, pool string) error {
+	stat, err := vdt.Stat()
+	if err != nil {
+		return err
+	}
+
+	name := vdt.Name()
+	typ := zfs.VDevTypeSpare
+	path := vdt.Path()
+
+	ch <- prometheus.MustNewConstMetric(
+		vdevStateDesc,
+		prometheus.GaugeValue,
+		float64(stat.State),
+		pool, typ, "", name, path,
+		strings.ToLower(stat.State.String()),
+	)
 
 	return nil
 }

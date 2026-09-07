@@ -203,6 +203,23 @@ func (vdt VDevTree) Children() []VDevTree {
 	return children
 }
 
+func (vdt VDevTree) Spares() []VDevTree {
+	nvls, err := vdt.nvl.LookupNVListArray(PoolConfigSpares)
+	if errors.Is(err, ErrNotFound) {
+		return []VDevTree{}
+	} else if err != nil {
+		panic(err)
+	}
+
+	spares := make([]VDevTree, len(nvls))
+	for i, nvl := range nvls {
+		spares[i].pool = vdt.pool
+		spares[i].nvl = nvl
+	}
+
+	return spares
+}
+
 func (vdt VDevTree) ScanStat() (PoolScanStat, error) {
 	var ss *C.pool_scan_stat_t
 	var count C.uint_t
