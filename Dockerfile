@@ -1,4 +1,4 @@
-FROM golang:alpine3.22 AS build
+FROM golang:alpine3.24 AS build
 
 RUN apk add \
         gcc \
@@ -12,7 +12,7 @@ ADD . .
 RUN go build -v -trimpath
 
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 RUN apk add zfs-libs
 COPY --from=build /build/zfs-exporter /usr/bin/
