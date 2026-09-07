@@ -16,7 +16,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/puzpuzpuz/xsync/v4"
 )
 
 // Persist global mappings between C pointers and their Golang counterparts to
