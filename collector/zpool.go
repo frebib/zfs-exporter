@@ -301,7 +301,7 @@ func (collector *ZpoolCollector) collectVdev(ch chan<- prometheus.Metric, vdt zf
 	// Try to resolve the root disk in /dev for the vdev disk (partition)
 	if path != "" && devType == zfs.VDevTypeDisk {
 		disk, err := diskFromPartition(path)
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Printf("error resolving disk path '%s': %s", path, err)
 		} else {
 			path = disk
